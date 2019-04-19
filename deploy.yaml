@@ -1,0 +1,77 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: "This CloudFormation template will set up an Ubuntu 18.04 instance with Ghidra and RE."
+Parameters:
+  UbuntuPassword:
+    Type : String
+    Description:
+      "Enter a password for access via RDP (username: ubuntu). Don't make this weak ok..."
+  MyKeyPair:
+    Type : AWS::EC2::KeyPair::KeyName
+    Description:
+      "Select a key pair to launch with Ghidra instance."
+  IPAddress:
+    Type: String
+    Description:
+      "Enter your IP Address here (ex. 0.0.0.0/32)"
+    AllowedPattern: (\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})
+    ConstraintDescription: Must be a valid IP CIDR range of the form x.x.x.x/x.
+Mappings:
+  RegionMap:
+    us-east-1:
+      AMI: ami-0a313d6098716f372
+    us-west-2:
+      AMI: ami-005bdb005fb00e791
+Resources:
+  GhidraServer:
+    Type: AWS::EC2::Instance                     
+    Properties:
+      BlockDeviceMappings:
+        - DeviceName: "/dev/sda1"
+          Ebs:
+            VolumeSize: 20
+            VolumeType: gp2
+      ImageId: !FindInMap
+        - RegionMap
+        - !Ref AWS::Region
+        - AMI
+      InstanceType: t3.medium
+      KeyName: !Ref MyKeyPair
+      Tags: 
+        - Key: Name
+          Value: Ghidra
+      SecurityGroups:
+        - !Ref GhidraSecurityGroup
+      UserData:
+        Fn::Base64:
+          !Sub |
+              #!/bin/bash -ex
+              echo "set grub-pc/install_devices /dev/nvme0n1" | sudo debconf-communicate
+              sudo apt-get -y -qq update
+              sudo apt-get -y -qq upgrade
+              sudo apt install unzip -y;
+              sudo apt install openjdk-11-jdk -y;
+              sudo apt install ubuntu-desktop -y;
+              sudo apt install xrdp -y;
+              echo 'ubuntu:${UbuntuPassword}' | sudo chpasswd;
+              sudo sed -i "/^[^#]*PasswordAuthentication[[:space:]]no/c\PasswordAuthentication yes" /etc/ssh/sshd_config;
+              sudo service sshd restart;
+              sudo wget -P /home/ubuntu/Downloads https://www.ghidra-sre.org/ghidra_9.0.2_PUBLIC_20190403.zip;
+              sudo chown ubuntu:ubuntu /home/ubuntu/Downloads/*;
+              unzip /home/ubuntu/Downloads/ghidra_9.0.2_PUBLIC_20190403.zip -d /home/ubuntu/Downloads/;
+              cd /home/ubuntu/Downloads;
+              wget https://crackmes.one/static/crackme/5b8a37a433c5d45fc286ad83.zip;
+              unzip -P crackmes.one 5b8a37a433c5d45fc286ad83.zip;
+              unzip rev50.zip;
+  GhidraSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Open necessary ports
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: !Ref IPAddress
+      - IpProtocol: tcp
+        FromPort: 3389
+        ToPort: 3389
+        CidrIp: !Ref IPAddress
