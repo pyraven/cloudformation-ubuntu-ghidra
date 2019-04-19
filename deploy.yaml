@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: "This CloudFormation template will set up an Ubuntu 18.04 instance with Ghidra and RE."
+Description: "This CloudFormation template will set up an Ubuntu 18.04 instance with Ghidra for RE."
 Parameters:
   UbuntuPassword:
     Type : String
